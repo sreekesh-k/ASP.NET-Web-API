@@ -1,29 +1,37 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
+# Base stage for runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 
-
-# This stage is used to build the service project
+# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
+# Copy project files and restore dependencies
 COPY ["Items-Web-API.csproj", "."]
 RUN dotnet restore "./Items-Web-API.csproj"
 COPY . .
-WORKDIR "/src/."
+
+# Build the project
 RUN dotnet build "./Items-Web-API.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
+# Install dotnet-ef tool for migrations
+RUN dotnet tool install --global dotnet-ef
+ENV PATH="$PATH:/root/.dotnet/tools"
+
+# Apply migrations during build
+RUN dotnet ef database update --project /src/Items-Web-API.csproj
+
+# Publish the application
 RUN dotnet publish "./Items-Web-API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+# Final stage for production
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+
+# Copy published files to the final stage
+COPY --from=build /app/publish .
+
+# Set runtime entry point
 ENTRYPOINT ["dotnet", "Items-Web-API.dll"]
