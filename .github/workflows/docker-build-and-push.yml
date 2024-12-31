@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build, Push, and Deploy
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Log in to Docker Hub
@@ -24,25 +24,19 @@ jobs:
           docker push $IMAGE_NAME:latest
 
       - name: Deploy to Server
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_PASSWORD: ${{ secrets.SSH_PRIVATE_KEY_PASSWORD }}
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          IMAGE_NAME: sreekesh26/itemsapi
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
-          sshpass -p "$SSH_PRIVATE_KEY_PASSWORD" ssh -t -o StrictHostKeyChecking=no -o ConnectTimeout=30 $SERVER_USER@$SERVER_HOST << EOF
-          set -x
-          echo "Pulling Docker image..."
-          docker pull $IMAGE_NAME:latest
-          echo "Stopping existing container..."
-          docker stop itemsapi || true
-          docker rm itemsapi || true
-          echo "Running new Docker container..."
-          docker run -d --name itemsapi -p 8080:8080 $IMAGE_NAME:latest
-          echo "Deployment completed successfully!"
-          EOF
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PRIVATE_KEY_PASSWORD }}
+          port: 22
+          script: |
+            echo "Pulling latest Docker image..."
+            docker pull sreekesh26/itemsapi:latest
+            echo "Stopping and removing existing container..."
+            docker stop itemsapi || true
+            docker rm itemsapi || true
+            echo "Running new Docker container..."
+            docker run -d --name itemsapi -p 8080:8080 sreekesh26/itemsapi:latest
+            echo "Deployment completed successfully!"
