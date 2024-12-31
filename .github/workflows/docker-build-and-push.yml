@@ -3,11 +3,11 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     steps:
     
@@ -19,11 +19,11 @@ jobs:
 
       - name: Build and Push Docker Image
         env:
-            IMAGE_NAME: sreekesh26/itemsapi
+          IMAGE_NAME: sreekesh26/itemsapi
         run: |
           docker build -t $IMAGE_NAME:latest .
           docker push $IMAGE_NAME:latest
-    
+
       - name: Deploy to Server
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -32,19 +32,26 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           IMAGE_NAME: sreekesh26/itemsapi
         run: |
-
+        
           sudo apt-get update
           sudo apt-get install -y sshpass
-
-         
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           sshpass -p "$SSH_PRIVATE_KEY_PASSWORD" ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << EOF
+            echo "Pulling Docker image..."
             docker pull $IMAGE_NAME:latest
-            docker itemsapi || true
-            docker rm itemsapi || true
-            docker run -d --name itemsapi -p 8080:8080 $IMAGE_NAME:latest
-          EOF
+            if [ $? -ne 0 ]; then echo "Error pulling image"; exit 1; fi
 
+            echo "Stopping existing container..."
+            docker stop itemsapi || true
+            docker rm itemsapi || true
+            if [ $? -ne 0 ]; then echo "Error stopping/removing container"; exit 1; fi
+
+            echo "Running new Docker container..."
+            docker run -d --name itemsapi -p 8080:8080 $IMAGE_NAME:latest
+            if [ $? -ne 0 ]; then echo "Error running container"; exit 1; fi
+
+            echo "Docker container deployed successfully!"
+          EOF
