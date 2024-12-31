@@ -39,19 +39,23 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          sshpass -p "$SSH_PRIVATE_KEY_PASSWORD" ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << EOF
-            echo "Pulling Docker image..."
-            docker pull $IMAGE_NAME:latest
-            if [ $? -ne 0 ]; then echo "Error pulling image"; exit 1; fi
+          sshpass -p "$SSH_PRIVATE_KEY_PASSWORD" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 $SERVER_USER@$SERVER_HOST << EOF
+          echo "Starting deployment process..."
+          set -x  
 
-            echo "Stopping existing container..."
-            docker stop itemsapi || true
-            docker rm itemsapi || true
-            if [ $? -ne 0 ]; then echo "Error stopping/removing container"; exit 1; fi
+          echo "Pulling Docker image..."
+          docker pull $IMAGE_NAME:latest
+          if [ $? -ne 0 ]; then echo "Error pulling image"; exit 1; fi
 
-            echo "Running new Docker container..."
-            docker run -d --name itemsapi -p 8080:8080 $IMAGE_NAME:latest
-            if [ $? -ne 0 ]; then echo "Error running container"; exit 1; fi
+          echo "Stopping existing container..."
+          docker stop itemsapi || true
+          docker rm itemsapi || true
+          if [ $? -ne 0 ]; then echo "Error stopping/removing container"; exit 1; fi
 
-            echo "Docker container deployed successfully!"
+          echo "Running new Docker container..."
+          docker run -d --name itemsapi -p 8080:8080 $IMAGE_NAME:latest
+          if [ $? -ne 0 ]; then echo "Error running container"; exit 1; fi
+
+          echo "Docker container deployed successfully!"
           EOF
+
