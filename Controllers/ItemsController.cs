@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Items_Web_API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/items")]
     [ApiController]
     public class ItemsController : ControllerBase
     {
